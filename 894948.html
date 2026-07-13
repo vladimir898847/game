@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Монетка: Приключение</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', sans-serif; color: #fff; }
+  #gameWrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 20, 40, 0.7);
+    backdrop-filter: blur(10px);
+    z-index: 20;
+    transition: opacity 0.4s;
+    pointer-events: auto;
+    overflow-y: auto;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
+  .title {
+    font-size: clamp(2.2rem, 6vw, 4rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, #ffd700 0%, #ff9500 50%, #ffd700 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 0.5rem; letter-spacing: 2px;
+  }
+  .subtitle {
+    font-size: 1.05rem; color: #cde; margin-bottom: 2rem;
+    text-align: center; max-width: 500px; line-height: 1.6; padding: 0 20px;
+  }
+  .btn {
+    padding: 14px 44px; font-size: 1.1rem; font-weight: 700;
+    color: #1a1a3e;
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    border: none; border-radius: 50px; cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 8px 25px rgba(255, 170, 0, 0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(255, 170, 0, 0.7); }
+  .btn:active { transform: translateY(0); }
+  .hud {
+    position: absolute; top: 15px; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 0 20px; z-index: 5; pointer-events: none;
+  }
+  .stat {
+    background: rgba(0, 20, 40, 0.5);
+    backdrop-filter: blur(8px);
+    padding: 8px 16px; border-radius: 30px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    font-weight: 700;
+  }
+  .stat .label { color: #ffd700; font-size: 0.7rem; letter-spacing: 1px; display: block; }
+  .stat .value { font-size: 1.2rem; }
+  .levelBar {
+    position: absolute; top: 75px; left: 20px; right: 20px;
+    height: 8px; background: rgba(0,0,0,0.4);
+    border-radius: 10px; overflow: hidden; z-index: 5;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .levelFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #ffd700, #ff6b00);
+    transition: width 0.2s;
+    box-shadow: 0 0 10px rgba(255, 200, 0, 0.6);
+  }
+  .levelName {
+    position: absolute; top: 90px; left: 20px;
+    font-size: 0.8rem; color: #ffd700;
+    letter-spacing: 2px; font-weight: 700;
+    z-index: 5; text-shadow: 0 0 10px rgba(0,0,0,0.8);
+  }
+  .levelAnnounce {
+    position: absolute; top: 40%; left: 0; right: 0;
+    text-align: center; z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .levelAnnounce.show { opacity: 1; }
+  .levelAnnounce .big {
+    font-size: clamp(2rem, 7vw, 5rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff, #ffd700);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+    letter-spacing: 4px;
+  }
+  .levelAnnounce .small {
+    font-size: 1.2rem; color: #fff;
+    margin-top: 10px; letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(0,0,0,0.8);
+  }
+  .final-score {
+    font-size: 3.5rem; font-weight: 900;
+    color: #ffd700; margin: 1rem 0;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+  }
+  .hint { margin-top: 1.5rem; color: rgba(255, 255, 255, 0.6); font-size: 0.85rem; }
+  .levels-list {
+    display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; justify-content: center;
+    max-width: 500px;
+  }
+  .level-chip {
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+  }
+  #soundBtn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    z-index: 25;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 20, 40, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    color: #ffd700;
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, background 0.2s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #soundBtn:hover { transform: scale(1.1); background: rgba(0, 20, 40, 0.8); }
+  #soundBtn.muted { color: #666; }
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="game"></canvas>
+  <button id="soundBtn" title="Звук">🔇</button>
+  <div class="hud" style="right: 70px;">
+    <div class="stat"><span class="label">ДИСТАНЦИЯ</span><span class="value" id="score">0</span></div>
+    <div class="stat"><span class="label">МОНЕТЫ</span><span class="value" id="coins">0</span></div>
+    <div class="stat"><span class="label">УРОВЕНЬ</span><span class="value" id="levelNum">1</span></div>
+    <div class="stat"><span class="label">РЕКОРД</span><span class="value" id="best">0</span></div>
+  </div>
+  <div class="levelBar"><div class="levelFill" id="levelFill"></div></div>
+  <div class="levelName" id="levelName">УРОВЕНЬ 1 · РАССВЕТ</div>
+  <div class="levelAnnounce" id="levelAnnounce">
+    <div class="big" id="announceBig">УРОВЕНЬ 2</div>
+    <div class="small" id="announceSmall">ТРОПИКИ</div>
+  </div>
+  <div class="overlay" id="startScreen">
+    <div class="title">МОНЕТКА</div>
+    <div class="subtitle">Катись сквозь 10 миров: от рассветного моря до радужных облаков. Прыгай, уклоняйся от птиц и не упади в бездну!</div>
+    <div class="levels-list">
+      <div class="level-chip">🌅 Рассвет</div>
+      <div class="level-chip">🌴 Тропики</div>
+      <div class="level-chip">🌙 Ночь</div>
+      <div class="level-chip">⛈ Шторм</div>
+      <div class="level-chip">🌋 Вулкан</div>
+      <div class="level-chip">✨ Космос</div>
+      <div class="level-chip">❄️ Ледяной</div>
+      <div class="level-chip">🏜 Пустыня</div>
+      <div class="level-chip">🌸 Сакура</div>
+      <div class="level-chip">🌈 Радуга</div>
+    </div>
+    <button class="btn" id="startBtn">НАЧАТЬ</button>
+    <div class="hint">ПРОБЕЛ / КЛИК / ↑ — прыжок (двойной тоже) · 🔊 в правом верхнем углу</div>
+  </div>
+  <div class="overlay hidden" id="gameOverScreen">
+    <div class="title" style="font-size:2.5rem;">УТОНУЛА!</div>
+    <div class="final-score" id="finalScore">0</div>
+    <div class="subtitle" id="finalCoins">Собрано монет: 0</div>
+    <div class="subtitle" id="finalLevel">Достигнут уровень: 1</div>
+    <button class="btn" id="restartBtn">СНОВА</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('gameWrap');
+  const startScreen = document.getElementById('startScreen');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const scoreEl = document.getElementById('score');
+  const coinsEl = document.getElementById('coins');
+  const bestEl = document.getElementById('best');
+  const levelNumEl = document.getElementById('levelNum');
+  const levelNameEl = document.getElementById('levelName');
+  const levelFill = document.getElementById('levelFill');
+  const finalScoreEl = document.getElementById('finalScore');
+  const finalCoinsEl = document.getElementById('finalCoins');
+  const finalLevelEl = document.getElementById('finalLevel');
+  const levelAnnounce = document.getElementById('levelAnnounce');
+  const announceBig = document.getElementById('announceBig');
+  const announceSmall = document.getElementById('announceSmall');
+  const soundBtn = document.getElementById('soundBtn');
+
+  let W = 0, H = 0;
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W;
+    canvas.height = H;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ============================================================
+  // АУДИО СИСТЕМА
+  // ============================================================
+  let audioCtx = null;
+  let masterGain = null;
+  let musicGain = null;
+  let sfxGain = null;
+  let soundEnabled = false;
+  let musicTimer = null;
+  let musicStep = 0;
+  let currentMusicLevel = -1;
+
+  function initAudio() {
+    if (audioCtx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.5;
+      masterGain.connect(audioCtx.destination);
+      musicGain = audioCtx.createGain();
+      musicGain.gain.value = 0.25;
+      musicGain.connect(masterGain);
+      sfxGain = audioCtx.createGain();
+      sfxGain.gain.value = 0.5;
+      sfxGain.connect(masterGain);
+    } catch(e) { console.warn('Audio not supported', e); }
+  }
+
+  function toggleSound() {
+    if (!audioCtx) initAudio();
+    soundEnabled = !soundEnabled;
+    if (soundEnabled) {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      soundBtn.textContent = '🔊';
+      soundBtn.classList.remove('muted');
+      if (state === 'playing') startMusic();
+    } else {
+      soundBtn.textContent = '🔇';
+      soundBtn.classList.add('muted');
+      stopMusic();
+    }
+  }
+
+  soundBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSound();
+  });
+
+  function noteFreq(note) {
+    const names = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
+    const m = note.match(/^([A-G]#?|Bb)(\d)$/);
+    if (!m) return 0;
+    const semitone = names[m[1]] + (parseInt(m[2]) + 1) * 12;
+    return 440 * Math.pow(2, (semitone - 69) / 12);
+  }
+
+  function playNote(freq, duration, type, volume, dest, when) {
+    if (!audioCtx || !soundEnabled) return;
+    const t = when || audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(volume || 0.3, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain);
+    gain.connect(dest || musicGain);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  function playChord(notes, duration, type, volume, dest, when) {
+    for (let i = 0; i < notes.length; i++) {
+      playNote(noteFreq(notes[i]), duration, type, volume / notes.length, dest, when);
+    }
+  }
+
+  function playKick(when, volume) {
+    if (!audioCtx || !soundEnabled) return;
+    const t = when || audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+    gain.gain.setValueAtTime(volume || 0.5, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(musicGain);
+    osc.start(t);
+    osc.stop(t + 0.25);
+  }
+
+  function playHat(when, volume) {
+    if (!audioCtx || !soundEnabled) return;
+    const t = when || audioCtx.currentTime;
+    const bufferSize = audioCtx.sampleRate * 0.05;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 7000;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(volume || 0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(musicGain);
+    src.start(t);
+  }
+
+  // Мелодии для 10 уровней
+  const MUSIC = [
+    { // 1. Рассвет
+      bpm: 120,
+      melody: ['E5','E5','_','E5','_','C5','E5','_','G5','_','_','_','G4','_','_','_',
+               'C5','_','_','E5','_','_','G5','_','_','_','_','G5','_','_','_','_'],
+      bass: ['C3','_','_','_','G2','_','_','_','A2','_','_','_','F2','_','G2','_'],
+      chord: [['C3','E3','G3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['G2','B2','D3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 2. Тропики
+      bpm: 130,
+      melody: ['E5','_','G5','_','A5','_','G5','E5','D5','_','E5','_','G5','_','_','_',
+               'A5','_','G5','_','E5','_','D5','C5','D5','_','E5','_','_','_','_','_'],
+      bass: ['A2','_','_','_','E3','_','_','_','D3','_','_','_','C3','_','_','_'],
+      chord: [['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['D3','F3','A3'],['_'],['_'],['_'],['_'],['_'],['E2','G2','B2'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 3. Ночь
+      bpm: 100,
+      melody: ['A4','_','C5','_','E5','_','D5','_','C5','_','A4','_','G4','_','_','_',
+               'A4','_','C5','_','E5','_','G5','_','E5','_','D5','_','C5','_','_','_'],
+      bass: ['A2','_','_','_','E2','_','_','_','F2','_','_','_','G2','_','_','_'],
+      chord: [['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['F2','A2','C3'],['_'],['_'],['_'],['_'],['_'],['G2','B2','D3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 4. Шторм
+      bpm: 140,
+      melody: ['D5','D5','_','F5','_','D5','_','C5','D5','_','_','A4','_','C5','_','_',
+               'D5','_','F5','_','G5','_','F5','D5','C5','_','D5','_','_','_','_','_'],
+      bass: ['D2','_','_','_','D2','_','_','_','Bb2','_','_','_','C3','_','_','_'],
+      chord: [['D3','F3','A3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['Bb2','D3','F3'],['_'],['_'],['_'],['_'],['_'],['C3','E3','G3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 5. Вулкан
+      bpm: 150,
+      melody: ['E5','_','E5','G5','_','F5','E5','_','D5','_','E5','_','_','_','_','_',
+               'E5','_','G5','_','A5','_','G5','E5','D5','_','C5','_','E5','_','_','_'],
+      bass: ['E2','_','E2','_','A2','_','_','_','B2','_','_','_','C3','_','_','_'],
+      chord: [['E2','G2','B2'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['B2','D3','F3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 6. Космос
+      bpm: 90,
+      melody: ['E5','_','_','_','G5','_','_','_','A5','_','_','_','G5','_','E5','_',
+               'D5','_','_','_','E5','_','_','_','G5','_','A5','_','B5','_','_','_'],
+      bass: ['E2','_','_','_','_','_','_','_','A2','_','_','_','_','_','_','_'],
+      chord: [['E3','G3','B3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['B2','D3','F3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 7. Ледяной — хрустальный, высокий
+      bpm: 110,
+      melody: ['A5','_','C6','_','E6','_','D6','_','C6','_','A5','_','G5','_','_','_',
+               'A5','_','C6','_','F6','_','E6','_','D6','_','C6','_','A5','_','_','_'],
+      bass: ['A2','_','_','_','E3','_','_','_','F3','_','_','_','G3','_','_','_'],
+      chord: [['A3','C4','E4'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['F3','A3','C4'],['_'],['_'],['_'],['_'],['_'],['G3','B3','D4'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 8. Пустыня — восточный мотив
+      bpm: 115,
+      melody: ['D5','_','D#5','_','D5','_','A4','_','D5','_','_','F5','_','D5','_','_',
+               'E5','_','D5','_','C5','_','D5','_','A4','_','_','_','_','_','_','_'],
+      bass: ['D2','_','_','_','A2','_','_','_','G2','_','_','_','F2','_','_','_'],
+      chord: [['D3','F3','A3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['G2','Bb2','D3'],['_'],['_'],['_'],['_'],['_'],['A2','C3','E3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 9. Сакура — японский мотив, пентатоника
+      bpm: 105,
+      melody: ['A4','_','C5','_','D5','_','E5','_','D5','_','C5','_','A4','_','_','_',
+               'G4','_','A4','_','C5','_','D5','_','E5','_','G5','_','E5','_','_','_'],
+      bass: ['A2','_','_','_','E2','_','_','_','G2','_','_','_','A2','_','_','_'],
+      chord: [['A2','C3','E3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['G2','B2','D3'],['_'],['_'],['_'],['_'],['_'],['A2','C3','E3'],['_']],
+      stepsPerBeat: 2
+    },
+    { // 10. Радуга — весёлая, мажорная
+      bpm: 135,
+      melody: ['C5','E5','G5','_','C6','_','G5','E5','F5','A5','C6','_','A5','F5','_','_',
+               'G5','B5','D6','_','B5','G5','E5','G5','C6','_','G5','E5','C5','_','_','_'],
+      bass: ['C3','_','_','_','G2','_','_','_','A2','_','_','_','F2','_','G2','_'],
+      chord: [['C3','E3','G3'],['_'],['_'],['_'],['_'],['_'],['_'],['_'],
+              ['F3','A3','C4'],['_'],['_'],['_'],['_'],['_'],['G3','B3','D4'],['_']],
+      stepsPerBeat: 2
+    }
+  ];
+
+  function startMusic() {
+    if (!audioCtx || !soundEnabled) return;
+    stopMusic();
+    currentMusicLevel = -1;
+    scheduleMusic();
+  }
+
+  function stopMusic() {
+    if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+  }
+
+  function scheduleMusic() {
+    if (!audioCtx || !soundEnabled || state !== 'playing') return;
+    const lvlIdx = typeof currentLevel !== 'undefined' ? currentLevel : 0;
+    if (lvlIdx !== currentMusicLevel) {
+      currentMusicLevel = lvlIdx;
+      musicStep = 0;
+    }
+    const m = MUSIC[lvlIdx];
+    const beatDur = 60 / m.bpm;
+    const stepDur = beatDur / m.stepsPerBeat;
+
+    const now = audioCtx.currentTime;
+    let stepsToSchedule = 4;
+    for (let i = 0; i < stepsToSchedule; i++) {
+      const stepIdx = (musicStep + i) % m.melody.length;
+      const t = now + i * stepDur;
+
+      const note = m.melody[stepIdx];
+      if (note && note !== '_') {
+        playNote(noteFreq(note), stepDur * 1.8, 'sine', 0.22, musicGain, t);
+        playNote(noteFreq(note) * 2, stepDur * 0.8, 'triangle', 0.05, musicGain, t);
+      }
+
+      if (stepIdx % 4 === 0) {
+        const bassNote = m.bass[Math.floor(stepIdx / 4) % m.bass.length];
+        if (bassNote && bassNote !== '_') {
+          playNote(noteFreq(bassNote), stepDur * 3.5, 'triangle', 0.3, musicGain, t);
+        }
+      }
+
+      if (stepIdx % 8 === 0) {
+        const chordIdx = Math.floor(stepIdx / 8) % m.chord.length;
+        const chord = m.chord[chordIdx];
+        if (chord && chord[0] !== '_') {
+          playChord(chord, stepDur * 7, 'triangle', 0.12, musicGain, t);
+        }
+      }
+
+      if (stepIdx % 4 === 0) playKick(t, 0.4);
+      if (stepIdx % 2 === 0) playHat(t, 0.08);
+      if (stepIdx % 4 === 2) playHat(t, 0.05);
+    }
+
+    musicStep = (musicStep + stepsToSchedule) % m.melody.length;
+    const nextTime = stepsToSchedule * stepDur * 1000 - 50;
+    musicTimer = setTimeout(scheduleMusic, nextTime);
+  }
+
+  function sfxJump() {
+    if (!audioCtx || !soundEnabled) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(gain);
+    gain.connect(sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  function sfxCoin() {
+    if (!audioCtx || !soundEnabled) return;
+    const t = audioCtx.currentTime;
+    playNote(noteFreq('E6'), 0.08, 'square', 0.2, sfxGain, t);
+    playNote(noteFreq('B6'), 0.15, 'square', 0.2, sfxGain, t + 0.06);
+  }
+
+  function sfxFall() {
+    if (!audioCtx || !soundEnabled) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    osc.connect(gain);
+    gain.connect(sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.7);
+  }
+
+  function sfxLevelUp() {
+    if (!audioCtx || !soundEnabled) return;
+    const t = audioCtx.currentTime;
+    const notes = ['C5', 'E5', 'G5', 'C6'];
+    for (let i = 0; i < notes.length; i++) {
+      playNote(noteFreq(notes[i]), 0.2, 'triangle', 0.25, sfxGain, t + i * 0.08);
+    }
+  }
+
+  // ============================================================
+  // 10 УРОВНЕЙ
+  // ============================================================
+  const LEVELS = [
+    {
+      name: 'РАССВЕТ', emoji: '🌅',
+      skyTop: '#ff9a76', skyMid: '#ffb88c', skyBot: '#a8d8ea',
+      waterTop: '#2a7fb8', waterBot: '#0a2a4a',
+      cloudColor: 'rgba(255,255,255,0.7)',
+      platTop: '#8b6a4a', platBot: '#3a2515',
+      grassTop: '#7ac74f', grassBot: '#4a8a2f',
+      sunColor: '#fff5c0', sunGlow: 'rgba(255, 220, 150, 0.6)',
+      speedMul: 1.0, gapMul: 1.0, platMul: 1.0,
+      hasBirds: false, hasMoving: false, hasBreakable: false,
+      bgFeature: 'sun'
+    },
+    {
+      name: 'ТРОПИКИ', emoji: '🌴',
+      skyTop: '#4ecdc4', skyMid: '#95e1d3', skyBot: '#f38181',
+      waterTop: '#00b4d8', waterBot: '#0077b6',
+      cloudColor: 'rgba(255,255,255,0.8)',
+      platTop: '#a0785a', platBot: '#4a2815',
+      grassTop: '#52b788', grassBot: '#2d6a4f',
+      sunColor: '#fffacd', sunGlow: 'rgba(255, 240, 100, 0.7)',
+      speedMul: 1.05, gapMul: 1.05, platMul: 0.98,
+      hasBirds: false, hasMoving: true, hasBreakable: false,
+      bgFeature: 'palms'
+    },
+    {
+      name: 'НОЧЬ', emoji: '🌙',
+      skyTop: '#0f0c29', skyMid: '#302b63', skyBot: '#24243e',
+      waterTop: '#1a3a5c', waterBot: '#050510',
+      cloudColor: 'rgba(150,150,200,0.3)',
+      platTop: '#4a4a6a', platBot: '#1a1a2e',
+      grassTop: '#3a5a4a', grassBot: '#1a2a20',
+      sunColor: '#f5f3ce', sunGlow: 'rgba(245, 243, 206, 0.4)',
+      speedMul: 1.1, gapMul: 1.1, platMul: 0.95,
+      hasBirds: true, hasMoving: true, hasBreakable: false,
+      bgFeature: 'moon'
+    },
+    {
+      name: 'ШТОРМ', emoji: '⛈',
+      skyTop: '#1a1a2e', skyMid: '#3d3d5c', skyBot: '#2a2a3e',
+      waterTop: '#2a3a4a', waterBot: '#0a0a1a',
+      cloudColor: 'rgba(60,60,80,0.8)',
+      platTop: '#5a5a6a', platBot: '#2a2a3a',
+      grassTop: '#4a6a4a', grassBot: '#2a3a2a',
+      sunColor: '#aaaacc', sunGlow: 'rgba(200, 200, 255, 0.3)',
+      speedMul: 1.15, gapMul: 1.15, platMul: 0.92,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'lightning'
+    },
+    {
+      name: 'ВУЛКАН', emoji: '🌋',
+      skyTop: '#2a0a0a', skyMid: '#6a1a0a', skyBot: '#aa3a1a',
+      waterTop: '#ff4500', waterBot: '#4a0a00',
+      cloudColor: 'rgba(80,30,20,0.7)',
+      platTop: '#3a2a2a', platBot: '#1a0a0a',
+      grassTop: '#5a3a2a', grassBot: '#2a1a0a',
+      sunColor: '#ff6a00', sunGlow: 'rgba(255, 100, 0, 0.7)',
+      speedMul: 1.2, gapMul: 1.2, platMul: 0.88,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'lava'
+    },
+    {
+      name: 'КОСМОС', emoji: '✨',
+      skyTop: '#000010', skyMid: '#0a0a2a', skyBot: '#1a0a3a',
+      waterTop: '#4a2a8a', waterBot: '#0a0020',
+      cloudColor: 'rgba(150,100,200,0.3)',
+      platTop: '#6a4a8a', platBot: '#2a1a4a',
+      grassTop: '#8a6aaa', grassBot: '#4a2a6a',
+      sunColor: '#ffffff', sunGlow: 'rgba(200, 150, 255, 0.5)',
+      speedMul: 1.25, gapMul: 1.25, platMul: 0.85,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'stars'
+    },
+    {
+      name: 'ЛЕДЯНОЙ', emoji: '❄️',
+      skyTop: '#a8d8ea', skyMid: '#c8e8f5', skyBot: '#e8f4fa',
+      waterTop: '#4a8ab8', waterBot: '#1a3a5a',
+      cloudColor: 'rgba(255,255,255,0.9)',
+      platTop: '#c8e8f5', platBot: '#6a9ab8',
+      grassTop: '#e8f4fa', grassBot: '#a8c8d8',
+      sunColor: '#ffffff', sunGlow: 'rgba(220, 240, 255, 0.6)',
+      speedMul: 1.3, gapMul: 1.25, platMul: 0.9,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'snow'
+    },
+    {
+      name: 'ПУСТЫНЯ', emoji: '🏜',
+      skyTop: '#ffd89b', skyMid: '#f5a962', skyBot: '#c87533',
+      waterTop: '#d4a055', waterBot: '#6a4020',
+      cloudColor: 'rgba(255,220,180,0.4)',
+      platTop: '#d4a055', platBot: '#8a5a2a',
+      grassTop: '#e8c888', grassBot: '#a88050',
+      sunColor: '#fff5a0', sunGlow: 'rgba(255, 230, 120, 0.8)',
+      speedMul: 1.35, gapMul: 1.3, platMul: 0.85,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'desert'
+    },
+    {
+      name: 'САКУРА', emoji: '🌸',
+      skyTop: '#ffd6e8', skyMid: '#ffb3d1', skyBot: '#ff8fb8',
+      waterTop: '#c86a9a', waterBot: '#5a2a4a',
+      cloudColor: 'rgba(255,220,235,0.8)',
+      platTop: '#8a5a3a', platBot: '#4a2a1a',
+      grassTop: '#ffb3d1', grassBot: '#c86a9a',
+      sunColor: '#fff0e8', sunGlow: 'rgba(255, 200, 220, 0.6)',
+      speedMul: 1.4, gapMul: 1.35, platMul: 0.82,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'sakura'
+    },
+    {
+      name: 'РАДУГА', emoji: '🌈',
+      skyTop: '#ff6b9d', skyMid: '#ffd93d', skyBot: '#6bcfff',
+      waterTop: '#c06bff', waterBot: '#4a1a6a',
+      cloudColor: 'rgba(255,255,255,0.85)',
+      platTop: '#ff6b9d', platBot: '#6a2a4a',
+      grassTop: '#ffd93d', grassBot: '#aa8a1a',
+      sunColor: '#ffffff', sunGlow: 'rgba(255, 255, 200, 0.7)',
+      speedMul: 1.5, gapMul: 1.4, platMul: 0.78,
+      hasBirds: true, hasMoving: true, hasBreakable: true,
+      bgFeature: 'rainbow'
+    }
+  ];
+
+  const LEVEL_THRESHOLDS = [0, 500, 1200, 2000, 3000, 4500, 6200, 8200, 10500, 13000];
+
+  const COIN_RADIUS = 22;
+  const GRAVITY = 0.55;
+  const JUMP_V = -12.5;
+  const BASE_SPEED = 5;
+  const PLATFORM_H = 22;
+
+  let state = 'start';
+  let coin, platforms, pickups, particles, clouds, waves, birds, stars, lightning, snowflakes, petals, rainbowPhase;
+  let distance, coinsCollected, speed, frame;
+  let cameraX = 0;
+  let currentLevel = 0;
+  let announceTimer = 0;
+  let best = 0;
+  try { best = parseInt(localStorage.getItem('coinRollBest3') || '0') || 0; } catch(e) {}
+  bestEl.textContent = best;
+
+  function waterLevel() { return H * 0.82; }
+
+  function getLevel() {
+    let lvl = 0;
+    for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+      if (distance >= LEVEL_THRESHOLDS[i]) { lvl = i; break; }
+    }
+    return Math.min(lvl, LEVELS.length - 1);
+  }
+
+  function getLevelProgress() {
+    const lvl = currentLevel;
+    const start = LEVEL_THRESHOLDS[lvl];
+    const end = lvl < LEVEL_THRESHOLDS.length - 1 ? LEVEL_THRESHOLDS[lvl + 1] : start + 2000;
+    return Math.min(1, (distance - start) / (end - start));
+  }
+
+  function resetGame() {
+    coin = {
+      x: 200, y: H * 0.4, vy: 0,
+      onGround: false, rotation: 0, trail: [], jumps: 0
+    };
+    platforms = [];
+    pickups = [];
+    particles = [];
+    clouds = [];
+    birds = [];
+    stars = [];
+    lightning = [];
+    snowflakes = [];
+    petals = [];
+    waves = [];
+    rainbowPhase = 0;
+    distance = 0;
+    coinsCollected = 0;
+    speed = BASE_SPEED;
+    frame = 0;
+    cameraX = 0;
+    currentLevel = 0;
+    announceTimer = 0;
+
+    platforms.push({ x: 0, y: H * 0.6, w: 600, type: 'solid' });
+    let lastX = 600, lastY = H * 0.6;
+    for (let i = 0; i < 15; i++) {
+      const res = generatePlatform(lastX, lastY);
+      platforms.push(res.plat);
+      lastX = res.plat.x + res.plat.w;
+      lastY = res.plat.y;
+    }
+
+    for (let i = 0; i < 8; i++) {
+      clouds.push({
+        x: Math.random() * W * 2,
+        y: 40 + Math.random() * H * 0.3,
+        scale: 0.5 + Math.random() * 0.8,
+        speed: 0.2 + Math.random() * 0.3
+      });
+    }
+    for (let i = 0; i < 3; i++) {
+      waves.push({ offset: Math.random() * Math.PI * 2, amp: 3 + i * 2, speed: 0.02 + i * 0.01 });
+    }
+    for (let i = 0; i < 150; i++) {
+      stars.push({
+        x: Math.random() * W * 3,
+        y: Math.random() * H * 0.7,
+        r: Math.random() * 1.5 + 0.3,
+        tw: Math.random() * Math.PI * 2
+      });
+    }
+    for (let i = 0; i < 80; i++) {
+      snowflakes.push({
+        x: Math.random() * W * 2,
+        y: Math.random() * H,
+        r: 1 + Math.random() * 3,
+        vy: 0.3 + Math.random() * 0.8,
+        vx: (Math.random() - 0.5) * 0.5,
+        tw: Math.random() * Math.PI * 2
+      });
+    }
+    for (let i = 0; i < 40; i++) {
+      petals.push({
+        x: Math.random() * W * 2,
+        y: Math.random() * H,
+        size: 3 + Math.random() * 5,
+        vy: 0.5 + Math.random() * 1,
+        vx: (Math.random() - 0.5) * 0.8,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.05
+      });
+    }
+
+    scoreEl.textContent = '0';
+    coinsEl.textContent = '0';
+    levelNumEl.textContent = '1';
+    updateLevelUI();
+  }
+
+  function generatePlatform(fromX, fromY) {
+    const lvl = LEVELS[currentLevel] || LEVELS[0];
+    const baseGap = 70 + Math.random() * 80;
+    const gap = baseGap * lvl.gapMul;
+    const baseW = 140 + Math.random() * 180;
+    const w = baseW * lvl.platMul;
+    const dy = (Math.random() - 0.45) * 120;
+    let y = fromY + dy;
+    const minY = H * 0.25;
+    const maxY = waterLevel() - 40;
+    y = Math.max(minY, Math.min(maxY, y));
+    const x = fromX + gap;
+
+    let type = 'solid';
+    if (lvl.hasMoving && Math.random() < 0.25) type = 'moving';
+    else if (lvl.hasBreakable && Math.random() < 0.2) type = 'breakable';
+
+    const plat = { x, y, w, type, baseY: y, phase: Math.random() * Math.PI * 2, breakTimer: 0, broken: false };
+
+    if (Math.random() < 0.6) {
+      const count = 2 + Math.floor(Math.random() * 3);
+      const arc = Math.random() < 0.5;
+      for (let i = 0; i < count; i++) {
+        const cx = x + 20 + (count > 1 ? i * (w - 40) / (count - 1) : 0);
+        let cy = y - 40;
+        if (arc && count > 1) cy = y - 40 - Math.sin((i / (count - 1)) * Math.PI) * 40;
+        pickups.push({ x: cx, y: cy, collected: false, bob: Math.random() * Math.PI * 2 });
+      }
+    }
+    return { plat };
+  }
+
+  function spawnBird() {
+    const lvl = LEVELS[currentLevel];
+    if (!lvl.hasBirds) return;
+    if (Math.random() > 0.008) return;
+    const y = H * 0.3 + Math.random() * (H * 0.3);
+    birds.push({
+      x: coin.x + W + 100,
+      y: y, baseY: y,
+      amp: 30 + Math.random() * 40,
+      phase: Math.random() * Math.PI * 2,
+      wingPhase: 0,
+      size: 20 + Math.random() * 10
+    });
+  }
+
+  function jump() {
+    if (state !== 'playing') return;
+    if (coin.jumps < 2) {
+      coin.vy = JUMP_V * (coin.jumps === 1 ? 0.85 : 1);
+      coin.onGround = false;
+      coin.jumps++;
+      sfxJump();
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: coin.x, y: coin.y + COIN_RADIUS,
+          vx: (Math.random() - 0.5) * 4,
+          vy: -Math.random() * 2,
+          life: 1,
+          color: coin.jumps === 2 ? '#a0d8ff' : '#ffd700'
+        });
+      }
+    }
+  }
+
+  window.addEventListener('keydown', function(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      if (state === 'start') startGame();
+      else if (state === 'over') restartGame();
+      else jump();
+    }
+  });
+  canvas.addEventListener('mousedown', function() { if (state === 'playing') jump(); });
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    if (state === 'playing') jump();
+  }, { passive: false });
+
+  startBtn.addEventListener('click', function(e) { e.preventDefault(); startGame(); });
+  startBtn.addEventListener('touchend', function(e) { e.preventDefault(); startGame(); });
+  restartBtn.addEventListener('click', function(e) { e.preventDefault(); restartGame(); });
+  restartBtn.addEventListener('touchend', function(e) { e.preventDefault(); restartGame(); });
+
+  function startGame() {
+    if (state === 'playing') return;
+    initAudio();
+    resetGame();
+    state = 'playing';
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    if (soundEnabled) startMusic();
+  }
+  function restartGame() {
+    if (state === 'playing') return;
+    resetGame();
+    state = 'playing';
+    gameOverScreen.classList.add('hidden');
+    if (soundEnabled) startMusic();
+  }
+
+  function showLevelAnnounce(lvl) {
+    announceBig.textContent = 'УРОВЕНЬ ' + (lvl + 1);
+    announceSmall.textContent = LEVELS[lvl].emoji + ' ' + LEVELS[lvl].name;
+    levelAnnounce.classList.add('show');
+    announceTimer = 120;
+    sfxLevelUp();
+  }
+
+  function updateLevelUI() {
+    const lvl = LEVELS[currentLevel];
+    levelNumEl.textContent = (currentLevel + 1);
+    levelNameEl.textContent = 'УРОВЕНЬ ' + (currentLevel + 1) + ' · ' + lvl.name;
+    levelFill.style.width = (getLevelProgress() * 100) + '%';
+  }
+
+  function gameOver() {
+    if (state !== 'playing') return;
+    state = 'over';
+    sfxFall();
+    stopMusic();
+    const wl = waterLevel();
+    for (let i = 0; i < 30; i++) {
+      particles.push({
+        x: coin.x, y: wl,
+        vx: (Math.random() - 0.5) * 10,
+        vy: -Math.random() * 10 - 2,
+        life: 1, color: '#a0d8ff'
+      });
+    }
+    const finalDist = Math.floor(distance);
+    if (finalDist > best) {
+      best = finalDist;
+      try { localStorage.setItem('coinRollBest3', String(best)); } catch(e) {}
+      bestEl.textContent = best;
+    }
+    finalScoreEl.textContent = finalDist;
+    finalCoinsEl.textContent = 'Собрано монет: ' + coinsCollected;
+    finalLevelEl.textContent = 'Достигнут уровень: ' + (currentLevel + 1) + ' · ' + LEVELS[currentLevel].name;
+    setTimeout(function() { gameOverScreen.classList.remove('hidden'); }, 500);
+  }
+
+  function update() {
+    frame++;
+    const lvl = LEVELS[currentLevel];
+    // Медленное нарастание скорости: делим на 700 вместо 400, максимум 3 вместо 4
+    speed = (BASE_SPEED + Math.min(distance / 700, 3)) * lvl.speedMul;
+    distance += speed * 0.1;
+
+    const newLevel = getLevel();
+    if (newLevel !== currentLevel) {
+      currentLevel = newLevel;
+      showLevelAnnounce(currentLevel);
+      if (soundEnabled) {
+        stopMusic();
+        currentMusicLevel = currentLevel;
+        musicStep = 0;
+        scheduleMusic();
+      }
+    }
+    if (announceTimer > 0) {
+      announceTimer--;
+      if (announceTimer === 0) levelAnnounce.classList.remove('show');
+    }
+    updateLevelUI();
+
+    coin.vy += GRAVITY;
+    coin.y += coin.vy;
+    coin.x += speed;
+    coin.rotation += speed * 0.08;
+    cameraX = coin.x - W * 0.3;
+
+    coin.trail.push({ x: coin.x, y: coin.y, life: 1 });
+    if (coin.trail.length > 18) coin.trail.shift();
+    for (let i = 0; i < coin.trail.length; i++) coin.trail[i].life -= 0.06;
+
+    coin.onGround = false;
+    for (let i = 0; i < platforms.length; i++) {
+      const p = platforms[i];
+      if (p.broken) continue;
+      if (p.type === 'moving') {
+        p.y = p.baseY + Math.sin(frame * 0.03 + p.phase) * 30;
+      }
+      if (coin.x + COIN_RADIUS > p.x && coin.x - COIN_RADIUS < p.x + p.w) {
+        if (coin.vy >= 0 &&
+            coin.y + COIN_RADIUS >= p.y &&
+            coin.y + COIN_RADIUS <= p.y + PLATFORM_H + 18) {
+          coin.y = p.y - COIN_RADIUS;
+          coin.vy = 0;
+          coin.onGround = true;
+          coin.jumps = 0;
+          if (p.type === 'breakable') {
+            p.breakTimer++;
+            if (p.breakTimer > 30) {
+              p.broken = true;
+              for (let j = 0; j < 10; j++) {
+                particles.push({
+                  x: p.x + Math.random() * p.w, y: p.y,
+                  vx: (Math.random() - 0.5) * 5,
+                  vy: Math.random() * 3,
+                  life: 1, color: '#8b6a4a'
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (coin.y - COIN_RADIUS > waterLevel()) { gameOver(); return; }
+
+    spawnBird();
+    for (let i = birds.length - 1; i >= 0; i--) {
+      const b = birds[i];
+      b.x -= speed * 0.5;
+      b.phase += 0.05;
+      b.wingPhase += 0.3;
+      b.y = b.baseY + Math.sin(b.phase) * b.amp;
+      const dx = coin.x - b.x;
+      const dy = coin.y - b.y;
+      if (dx * dx + dy * dy < (COIN_RADIUS + b.size) * (COIN_RADIUS + b.size)) {
+        gameOver(); return;
+      }
+      if (b.x < cameraX - 100) birds.splice(i, 1);
+    }
+
+    for (let i = 0; i < pickups.length; i++) {
+      const p = pickups[i];
+      p.bob += 0.08;
+      if (!p.collected) {
+        const dx = coin.x - p.x;
+        const dy = coin.y - (p.y + Math.sin(p.bob) * 4);
+        if (dx * dx + dy * dy < (COIN_RADIUS + 12) * (COIN_RADIUS + 12)) {
+          p.collected = true;
+          coinsCollected++;
+          coinsEl.textContent = coinsCollected;
+          sfxCoin();
+          for (let j = 0; j < 12; j++) {
+            const a = (j / 12) * Math.PI * 2;
+            particles.push({
+              x: p.x, y: p.y,
+              vx: Math.cos(a) * 3, vy: Math.sin(a) * 3,
+              life: 1, color: '#fff5a0'
+            });
+          }
+        }
+      }
+    }
+
+    const last = platforms[platforms.length - 1];
+    if (!last || last.x + last.w < coin.x + W * 1.5) {
+      const np = generatePlatform(last ? last.x + last.w : coin.x + W, last ? last.y : H * 0.6);
+      platforms.push(np.plat);
+    }
+
+    platforms = platforms.filter(function(p) { return p.x + p.w > cameraX - 200 && !p.broken; });
+    pickups = pickups.filter(function(p) { return p.x > cameraX - 100 && !p.collected; });
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.life -= 0.025;
+    }
+    particles = particles.filter(function(p) { return p.life > 0; });
+
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      c.x -= c.speed;
+      if (c.x < cameraX - 200) c.x = cameraX + W + Math.random() * 200;
+    }
+
+    // Снежинки
+    for (let i = 0; i < snowflakes.length; i++) {
+      const s = snowflakes[i];
+      s.y += s.vy;
+      s.x += s.vx + Math.sin(frame * 0.01 + i) * 0.3;
+      s.tw += 0.05;
+      if (s.y > H) { s.y = -10; s.x = cameraX + Math.random() * W; }
+      if (s.x < cameraX - 50) s.x = cameraX + W + 50;
+      if (s.x > cameraX + W + 50) s.x = cameraX - 50;
+    }
+
+    // Лепестки сакуры
+    for (let i = 0; i < petals.length; i++) {
+      const p = petals[i];
+      p.y += p.vy;
+      p.x += p.vx + Math.sin(frame * 0.01 + i) * 0.5;
+      p.rot += p.rotSpeed;
+      if (p.y > H) { p.y = -10; p.x = cameraX + Math.random() * W; }
+      if (p.x < cameraX - 50) p.x = cameraX + W + 50;
+      if (p.x > cameraX + W + 50) p.x = cameraX - 50;
+    }
+
+    // Молнии
+    const curLvl = LEVELS[currentLevel];
+    if (curLvl.bgFeature === 'lightning') {
+      if (Math.random() < 0.005) {
+        lightning.push({ x: cameraX + Math.random() * W, life: 20, segments: [] });
+        const l = lightning[lightning.length - 1];
+        let y = 0; let x = l.x;
+        while (y < H * 0.6) {
+          const nx = x + (Math.random() - 0.5) * 60;
+          const ny = y + 20 + Math.random() * 30;
+          l.segments.push({ x1: x, y1: y, x2: nx, y2: ny });
+          x = nx; y = ny;
+        }
+      }
+      for (let i = lightning.length - 1; i >= 0; i--) {
+        lightning[i].life--;
+        if (lightning[i].life <= 0) lightning.splice(i, 1);
+      }
+    }
+
+    if (curLvl.bgFeature === 'rainbow') {
+      rainbowPhase += 0.01;
+    }
+
+    scoreEl.textContent = Math.floor(distance);
+  }
+
+  // --- Draw ---
+  function drawSky() {
+    const lvl = LEVELS[currentLevel];
+    let topC = lvl.skyTop, midC = lvl.skyMid, botC = lvl.skyBot;
+    // Радуга — плавная смена цветов
+    if (lvl.bgFeature === 'rainbow') {
+      const hue = (rainbowPhase * 30) % 360;
+      topC = 'hsl(' + hue + ', 80%, 70%)';
+      midC = 'hsl(' + ((hue + 60) % 360) + ', 80%, 75%)';
+      botC = 'hsl(' + ((hue + 120) % 360) + ', 80%, 75%)';
+    }
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, topC);
+    grad.addColorStop(0.5, midC);
+    grad.addColorStop(1, botC);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawStars() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'moon' && lvl.bgFeature !== 'stars') return;
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const sx = (s.x - cameraX * 0.1) % (W + 100);
+      const x = sx < 0 ? sx + W + 100 : sx;
+      s.tw += 0.03;
+      const a = 0.4 + Math.sin(s.tw) * 0.4;
+      ctx.fillStyle = 'rgba(255, 240, 220, ' + a + ')';
+      ctx.beginPath();
+      ctx.arc(x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSunMoon() {
+    const lvl = LEVELS[currentLevel];
+    const sunX = W * 0.75;
+    const sunY = H * 0.25;
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 120);
+    sunGrad.addColorStop(0, lvl.sunGlow);
+    sunGrad.addColorStop(1, 'rgba(255, 200, 100, 0)');
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 120, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = lvl.sunColor;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, lvl.bgFeature === 'moon' ? 35 : 40, 0, Math.PI * 2);
+    ctx.fill();
+    if (lvl.bgFeature === 'moon') {
+      ctx.fillStyle = 'rgba(180, 180, 160, 0.4)';
+      ctx.beginPath(); ctx.arc(sunX - 10, sunY - 8, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sunX + 8, sunY + 5, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sunX - 5, sunY + 12, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawPalms() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'palms') return;
+    for (let i = 0; i < 5; i++) {
+      const baseX = ((i * 400 - cameraX * 0.4) % (W + 400) + W + 400) % (W + 400) - 200;
+      const baseY = waterLevel() - 10;
+      ctx.strokeStyle = '#5a3a1a';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(baseX, baseY);
+      ctx.quadraticCurveTo(baseX + 10, baseY - 60, baseX + 5, baseY - 120);
+      ctx.stroke();
+      ctx.fillStyle = '#2d6a4f';
+      for (let j = 0; j < 6; j++) {
+        const a = (j / 6) * Math.PI * 2;
+        ctx.save();
+        ctx.translate(baseX + 5, baseY - 120);
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.ellipse(30, 0, 35, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawVolcanoBg() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'lava') return;
+    const vx = W * 0.3;
+    const vy = waterLevel();
+    ctx.fillStyle = '#2a0a0a';
+    ctx.beginPath();
+    ctx.moveTo(vx - 200, vy);
+    ctx.lineTo(vx - 40, vy - 200);
+    ctx.lineTo(vx + 40, vy - 200);
+    ctx.lineTo(vx + 200, vy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ff6a00';
+    ctx.beginPath();
+    ctx.arc(vx, vy - 200, 25 + Math.sin(frame * 0.1) * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(60, 30, 20, 0.5)';
+    for (let i = 0; i < 5; i++) {
+      const sx = vx + Math.sin(frame * 0.02 + i) * 20;
+      const sy = vy - 220 - i * 25;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 15 + i * 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSnowBg() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'snow') return;
+    // Горы на фоне
+    for (let i = 0; i < 4; i++) {
+      const mx = ((i * 350 - cameraX * 0.3) % (W + 400) + W + 400) % (W + 400) - 200;
+      const my = waterLevel();
+      ctx.fillStyle = 'rgba(200, 220, 240, 0.6)';
+      ctx.beginPath();
+      ctx.moveTo(mx - 150, my);
+      ctx.lineTo(mx, my - 180 - i * 20);
+      ctx.lineTo(mx + 150, my);
+      ctx.closePath();
+      ctx.fill();
+      // Снежные шапки
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath();
+      ctx.moveTo(mx - 40, my - 140 - i * 20);
+      ctx.lineTo(mx, my - 180 - i * 20);
+      ctx.lineTo(mx + 40, my - 140 - i * 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Снежинки
+    for (let i = 0; i < snowflakes.length; i++) {
+      const s = snowflakes[i];
+      const sx = s.x - cameraX * 0.5;
+      const screenX = ((sx % (W + 100)) + W + 100) % (W + 100) - 50;
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + (0.5 + Math.sin(s.tw) * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(screenX, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawDesertBg() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'desert') return;
+    // Дюны
+    for (let i = 0; i < 5; i++) {
+      const dx = ((i * 300 - cameraX * 0.35) % (W + 400) + W + 400) % (W + 400) - 200;
+      const dy = waterLevel();
+      ctx.fillStyle = 'rgba(210, 150, 80, ' + (0.5 + i * 0.1) + ')';
+      ctx.beginPath();
+      ctx.moveTo(dx - 200, dy);
+      ctx.quadraticCurveTo(dx, dy - 80 - i * 10, dx + 200, dy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Кактусы
+    for (let i = 0; i < 3; i++) {
+      const cx = ((i * 500 + 100 - cameraX * 0.5) % (W + 600) + W + 600) % (W + 600) - 300;
+      const cy = waterLevel() - 10;
+      ctx.fillStyle = '#3a6a3a';
+      ctx.fillRect(cx - 6, cy - 60, 12, 60);
+      ctx.fillRect(cx - 20, cy - 40, 14, 8);
+      ctx.fillRect(cx - 20, cy - 40, 8, 25);
+      ctx.fillRect(cx + 6, cy - 50, 14, 8);
+      ctx.fillRect(cx + 12, cy - 50, 8, 30);
+    }
+  }
+
+  function drawSakuraBg() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'sakura') return;
+    // Деревья сакуры
+    for (let i = 0; i < 4; i++) {
+      const tx = ((i * 450 - cameraX * 0.4) % (W + 500) + W + 500) % (W + 500) - 250;
+      const ty = waterLevel();
+      // Ствол
+      ctx.strokeStyle = '#5a3a2a';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.quadraticCurveTo(tx + 5, ty - 80, tx, ty - 150);
+      ctx.stroke();
+      // Крона — розовые облака
+      ctx.fillStyle = 'rgba(255, 180, 210, 0.8)';
+      for (let j = 0; j < 5; j++) {
+        const cx = tx + (Math.cos(j * 1.2) * 40);
+        const cy = ty - 150 + (Math.sin(j * 1.2) * 20);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 30 + Math.sin(frame * 0.02 + j) * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Лепестки
+    for (let i = 0; i < petals.length; i++) {
+      const p = petals[i];
+      const sx = p.x - cameraX * 0.5;
+      const screenX = ((sx % (W + 100)) + W + 100) % (W + 100) - 50;
+      ctx.save();
+      ctx.translate(screenX, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = 'rgba(255, 180, 210, 0.8)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.size, p.size * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawRainbowBg() {
+    const lvl = LEVELS[currentLevel];
+    if (lvl.bgFeature !== 'rainbow') return;
+    // Большая радуга на фоне
+    const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3'];
+    const cx = W * 0.5;
+    const cy = waterLevel() + 100;
+    for (let i = 0; i < colors.length; i++) {
+      ctx.strokeStyle = colors[i];
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 350 - i * 18, Math.PI, 0);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawClouds() {
+    const lvl = LEVELS[currentLevel];
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      const sx = c.x - cameraX * 0.3;
+      if (sx < -200 || sx > W + 200) continue;
+      ctx.fillStyle = lvl.cloudColor;
+      ctx.beginPath();
+      ctx.arc(sx, c.y, 25 * c.scale, 0, Math.PI * 2);
+      ctx.arc(sx + 25 * c.scale, c.y - 8 * c.scale, 22 * c.scale, 0, Math.PI * 2);
+      ctx.arc(sx + 50 * c.scale, c.y, 28 * c.scale, 0, Math.PI * 2);
+      ctx.arc(sx + 25 * c.scale, c.y + 10 * c.scale, 20 * c.scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawLightning() {
+    for (let i = 0; i < lightning.length; i++) {
+      const l = lightning[i];
+      ctx.strokeStyle = 'rgba(255, 255, 200, ' + (l.life / 20) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let j = 0; j < l.segments.length; j++) {
+        const s = l.segments[j];
+        const sx1 = s.x1 - cameraX, sx2 = s.x2 - cameraX;
+        if (j === 0) ctx.moveTo(sx1, s.y1);
+        ctx.lineTo(sx2, s.y2);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 255, 255, ' + (l.life / 40) + ')';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+    }
+  }
+
+  function drawWater() {
+    const wl = waterLevel();
+    const lvl = LEVELS[currentLevel];
+    const waterGrad = ctx.createLinearGradient(0, wl, 0, H);
+    waterGrad.addColorStop(0, lvl.waterTop);
+    waterGrad.addColorStop(1, lvl.waterBot);
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(0, wl, W, H - wl);
+
+    for (let i = 0; i < waves.length; i++) {
+      const w = waves[i];
+      ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.3 - i * 0.08) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 8) {
+        const y = wl + i * 6 + Math.sin((x + cameraX) * 0.02 + frame * w.speed + w.offset) * w.amp;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    let shimmerColor = 'rgba(255, 255, 255, 0.15)';
+    if (lvl.bgFeature === 'lava') shimmerColor = 'rgba(255, 200, 100, 0.3)';
+    else if (lvl.bgFeature === 'rainbow') {
+      const hue = (rainbowPhase * 60 + frame) % 360;
+      shimmerColor = 'hsla(' + hue + ', 80%, 70%, 0.3)';
+    }
+    ctx.fillStyle = shimmerColor;
+    for (let i = 0; i < 20; i++) {
+      const x = ((i * 97 + frame * 0.5) % (W + 100)) - 50;
+      const y = wl + 10 + (i * 13) % (H - wl - 20);
+      ctx.fillRect(x, y, 20 + Math.sin(frame * 0.1 + i) * 5, 1.5);
+    }
+  }
+
+  function drawPlatform(p) {
+    const sx = p.x - cameraX;
+    if (sx + p.w < 0 || sx > W) return;
+    const lvl = LEVELS[currentLevel];
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(sx, waterLevel() - 4, p.w, 6);
+
+    let topC = lvl.platTop, botC = lvl.platBot;
+    if (p.type === 'moving') { topC = '#6aa0d4'; botC = '#2a5a8a'; }
+    else if (p.type === 'breakable') {
+      const shake = p.breakTimer > 0 ? (Math.random() - 0.5) * 3 : 0;
+      ctx.save();
+      ctx.translate(shake, shake);
+      topC = '#a04a3a'; botC = '#5a1a0a';
+    }
+
+    // Радужная платформа для последнего уровня
+    if (lvl.bgFeature === 'rainbow' && p.type === 'solid') {
+      const hue = ((p.x * 0.5 + frame) % 360);
+      topC = 'hsl(' + hue + ', 80%, 60%)';
+      botC = 'hsl(' + hue + ', 80%, 35%)';
+    }
+
+    const bodyGrad = ctx.createLinearGradient(0, p.y, 0, p.y + PLATFORM_H + 40);
+    bodyGrad.addColorStop(0, topC);
+    bodyGrad.addColorStop(1, botC);
+    ctx.fillStyle = bodyGrad;
+    ctx.fillRect(sx, p.y, p.w, PLATFORM_H + 40);
+
+    const grassGrad = ctx.createLinearGradient(0, p.y - 8, 0, p.y + 8);
+    grassGrad.addColorStop(0, lvl.grassTop);
+    grassGrad.addColorStop(1, lvl.grassBot);
+    ctx.fillStyle = grassGrad;
+    ctx.fillRect(sx - 2, p.y - 6, p.w + 4, 12);
+
+    ctx.strokeStyle = lvl.grassBot;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < p.w; i += 6) {
+      const bx = sx + i;
+      const sway = Math.sin(frame * 0.05 + i * 0.1) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(bx, p.y - 6);
+      ctx.lineTo(bx + sway, p.y - 10 - (i % 3));
+      ctx.stroke();
+    }
+
+    if (p.type === 'moving') {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.moveTo(sx + p.w/2 - 6, p.y + 10);
+      ctx.lineTo(sx + p.w/2, p.y + 4);
+      ctx.lineTo(sx + p.w/2 + 6, p.y + 10);
+      ctx.closePath();
+      ctx.fill();
+    } else if (p.type === 'breakable') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx + p.w * 0.3, p.y);
+      ctx.lineTo(sx + p.w * 0.4, p.y + PLATFORM_H);
+      ctx.moveTo(sx + p.w * 0.6, p.y);
+      ctx.lineTo(sx + p.w * 0.7, p.y + PLATFORM_H);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillRect(sx, p.y + 2, p.w, 2);
+
+    if (p.type === 'breakable') ctx.restore();
+  }
+
+  function drawBird(b) {
+    const sx = b.x - cameraX;
+    if (sx < -50 || sx > W + 50) return;
+    const wing = Math.sin(b.wingPhase) * 0.6;
+    ctx.save();
+    ctx.translate(sx, b.y);
+    ctx.fillStyle = '#2a1a2a';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, b.size, b.size * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3a2a3a';
+    ctx.beginPath();
+    ctx.moveTo(-b.size * 0.3, 0);
+    ctx.quadraticCurveTo(-b.size * 1.2, -b.size * wing, -b.size * 1.5, 0);
+    ctx.quadraticCurveTo(-b.size * 1.2, b.size * wing * 0.5, -b.size * 0.3, 0);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(b.size * 0.3, 0);
+    ctx.quadraticCurveTo(b.size * 1.2, -b.size * wing, b.size * 1.5, 0);
+    ctx.quadraticCurveTo(b.size * 1.2, b.size * wing * 0.5, b.size * 0.3, 0);
+    ctx.fill();
+    ctx.fillStyle = '#ff3a3a';
+    ctx.beginPath();
+    ctx.arc(b.size * 0.6, -b.size * 0.1, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPickup(p) {
+    if (p.collected) return;
+    const sx = p.x - cameraX;
+    if (sx < -30 || sx > W + 30) return;
+    const by = p.y + Math.sin(p.bob) * 4;
+
+    const glow = ctx.createRadialGradient(sx, by, 0, sx, by, 22);
+    glow.addColorStop(0, 'rgba(255, 230, 100, 0.6)');
+    glow.addColorStop(1, 'rgba(255, 230, 100, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(sx, by, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    const scaleX = Math.abs(Math.cos(frame * 0.1 + p.bob));
+    ctx.save();
+    ctx.translate(sx, by);
+    ctx.scale(scaleX * 0.8 + 0.2, 1);
+    const g = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11);
+    g.addColorStop(0, '#fff5a0');
+    g.addColorStop(0.5, '#ffd700');
+    g.addColorStop(1, '#b8860b');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a6a0a';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (scaleX > 0.4) {
+      ctx.fillStyle = '#8a6a0a';
+      ctx.font = 'bold 11px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('₽', 0, 1);
+    }
+    ctx.restore();
+  }
+
+  function drawCoin() {
+    const sx = coin.x - cameraX;
+
+    for (let i = 0; i < coin.trail.length; i++) {
+      const t = coin.trail[i];
+      if (t.life <= 0) continue;
+      const tsx = t.x - cameraX;
+      ctx.fillStyle = 'rgba(255, 215, 0, ' + (t.life * 0.35) + ')';
+      ctx.beginPath();
+      ctx.arc(tsx, t.y, COIN_RADIUS * t.life * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const glow = ctx.createRadialGradient(sx, coin.y, 0, sx, coin.y, COIN_RADIUS * 2.2);
+    glow.addColorStop(0, 'rgba(255, 220, 80, 0.5)');
+    glow.addColorStop(1, 'rgba(255, 220, 80, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(sx, coin.y, COIN_RADIUS * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    const scaleX = Math.cos(coin.rotation);
+    const absScale = Math.abs(scaleX);
+
+    ctx.save();
+    ctx.translate(sx, coin.y);
+    ctx.scale(scaleX * 0.3 + 0.7, 1);
+    if (scaleX < 0) ctx.scale(-1, 1);
+
+    const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, COIN_RADIUS);
+    outerGrad.addColorStop(0, '#fff5a0');
+    outerGrad.addColorStop(0.4, '#ffd700');
+    outerGrad.addColorStop(0.8, '#daa520');
+    outerGrad.addColorStop(1, '#8b6914');
+    ctx.fillStyle = outerGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, COIN_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    const innerGrad = ctx.createRadialGradient(-3, -3, 1, 0, 0, COIN_RADIUS * 0.85);
+    innerGrad.addColorStop(0, '#ffeb7a');
+    innerGrad.addColorStop(1, '#d4a017');
+    ctx.fillStyle = innerGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, COIN_RADIUS * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (absScale > 0.3) {
+      ctx.strokeStyle = 'rgba(139, 105, 20, 0.6)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * COIN_RADIUS * 0.75, Math.sin(a) * COIN_RADIUS * 0.75);
+        ctx.lineTo(Math.cos(a) * COIN_RADIUS * 0.85, Math.sin(a) * COIN_RADIUS * 0.85);
+        ctx.stroke();
+      }
+    }
+
+    if (absScale > 0.5) {
+      ctx.fillStyle = '#8b6914';
+      ctx.font = 'bold 22px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('₽', 0, 2);
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(-COIN_RADIUS * 0.3, -COIN_RADIUS * 0.4, COIN_RADIUS * 0.3, COIN_RADIUS * 0.15, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#5a4010';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, COIN_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      ctx.fillStyle = p.color || '#fff';
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.beginPath();
+      ctx.arc(p.x - cameraX, p.y, 3 * p.life + 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    drawSky();
+    drawStars();
+    drawSunMoon();
+    drawPalms();
+    drawVolcanoBg();
+    drawSnowBg();
+    drawDesertBg();
+    drawSakuraBg();
+    drawRainbowBg();
+    drawClouds();
+    drawLightning();
+    for (let i = 0; i < platforms.length; i++) drawPlatform(platforms[i]);
+    drawWater();
+    for (let i = 0; i < birds.length; i++) drawBird(birds[i]);
+    for (let i = 0; i < pickups.length; i++) drawPickup(pickups[i]);
+    drawCoin();
+    drawParticles();
+  }
+
+  function mainLoop() {
+    if (state === 'playing') {
+      update();
+    } else {
+      frame++;
+      for (let i = 0; i < clouds.length; i++) {
+        const c = clouds[i];
+        c.x -= c.speed;
+        if (c.x < cameraX - 200) c.x = cameraX + W + Math.random() * 200;
+      }
+    }
+    draw();
+    requestAnimationFrame(mainLoop);
+  }
+
+  resetGame();
+  mainLoop();
+
+})();
+</script>
+</body>
+</html>
